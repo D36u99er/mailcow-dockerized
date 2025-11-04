@@ -9,16 +9,18 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      BWG104_SSH_KEY: ${{ secrets.BWG104_SSH_KEY }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Provision SSH key (optional)
-        if: secrets.BWG104_SSH_KEY != ''
+        if: env.BWG104_SSH_KEY != ''
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.BWG104_SSH_KEY }}
+          ssh-private-key: ${{ env.BWG104_SSH_KEY }}
 
       - name: Trust deployment host
         env:
