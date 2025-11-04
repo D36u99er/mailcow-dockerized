@@ -1,0 +1,62 @@
+name: Deploy BWG104
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Provision SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.BWG104_SSH_KEY }}
+
+      - name: Trust deployment host
+        env:
+          DEPLOY_HOST: ${{ secrets.BWG104_SSH_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Deploy mailcow stack
+        env:
+          DEPLOY_HOST: ${{ secrets.BWG104_SSH_HOST }}
+          DEPLOY_USER: ${{ secrets.BWG104_SSH_USER }}
+        run: |
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'bash -s' <<'EOF'
+          set -euo pipefail
+
+          REPO_URL="https://github.com/D36u99er/mailcow-dockerized.git"
+          REPO_DIR="/opt/mailcow-dockerized"
+
+          if [ ! -d "${REPO_DIR}/.git" ]; then
+            git clone --depth=1 "${REPO_URL}" "${REPO_DIR}"
+          fi
+
+          cd "${REPO_DIR}"
+          git fetch origin
+          git checkout master
+          git reset --hard origin/master
+
+          if [ ! -f mailcow.conf ]; then
+            echo "mailcow.conf is missing. Run ./generate_config.sh manually before deploying."
+            exit 1
+          fi
+
+          if command -v docker-compose >/dev/null 2>&1; then
+            COMPOSE="docker-compose"
+          else
+            COMPOSE="docker compose"
+          fi
+
+          ${COMPOSE} pull
+          ${COMPOSE} up -d
+          EOF
